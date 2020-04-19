@@ -1,0 +1,53 @@
+version: "3.7"
+services:
+  # PHP Service
+  app:
+    environment:
+      APP_ENV: local
+      PHP_OPCACHE_VALIDATE_TIMESTAMPS: 0
+    volumes:
+      - ./application:/var/www
+
+  # NGINX Service
+  nginx:
+    volumes:
+      - ./application:/var/www
+    depends_on:
+      - app
+
+  # MySQL Service
+  mysql:
+    image: mysql:5.7.22
+    container_name: hubseg-mysql
+    restart: unless-stopped
+    tty: true
+    ports:
+      - "3306:3306"
+    volumes:
+      - ./docker/mysql/my.cnf:/etc/mysql/conf.d/my.cnf
+      - ./mysql-data:/var/lib/mysql
+    environment:
+      MYSQL_DATABASE: hubseg
+      MYSQL_ALLOW_EMPTY_PASSWORD: 1
+    networks:
+      - hubseg-network
+
+  redis:
+    image: redis:rc-alpine
+    container_name: hubseg-redis
+    networks:
+      - hubseg-network
+
+  mailcatcher:
+    build:
+      context: docker/mailcatcher
+      dockerfile: Dockerfile
+      args:
+        SMTP_PORT: 1025
+        HTTP_PORT: 1080
+    image: hubseg-mailcatcher:${IMAGE_TAG:-latest}
+    container_name: hubseg-mailcatcher
+    ports:
+      - "1080:1080"
+    networks:
+      - hubseg-network

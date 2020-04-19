@@ -1,0 +1,90 @@
+version: '3.7'
+services:
+  php:
+    build:
+      context: .
+      dockerfile: docker/php/base/Dockerfile
+    image: 376372006699.dkr.ecr.us-east-1.amazonaws.com/hubseg-v2-php:${IMAGE_TAG:-latest}
+    init: true
+    volumes:
+      - ./application:/var/www
+    working_dir: /var/www
+
+  php-cs-fixer:
+    build:
+      context: .
+      dockerfile: docker/composer/Dockerfile
+    image: 376372006699.dkr.ecr.us-east-1.amazonaws.com/hubseg-v2-composer:${IMAGE_TAG:-latest}
+    init: true
+    volumes:
+      - ./application:/var/www
+    entrypoint: vendor/bin/php-cs-fixer
+    command: fix --verbose --show-progress=estimating
+
+  phpstan:
+    build:
+      context: .
+      dockerfile: docker/composer/Dockerfile
+    image: 376372006699.dkr.ecr.us-east-1.amazonaws.com/hubseg-v2-composer:${IMAGE_TAG:-latest}
+    init: true
+    volumes:
+      - ./application:/var/www
+    entrypoint: vendor/bin/phpstan
+    command: analyse
+
+  composer:
+    build:
+      context: .
+      dockerfile: docker/composer/Dockerfile
+    image: 376372006699.dkr.ecr.us-east-1.amazonaws.com/hubseg-v2-composer:${IMAGE_TAG:-latest}
+    working_dir: /var/www
+    volumes:
+      - ./application:/var/www
+      - composer-cache:/root/.composer/cache
+      - ${COMPOSER_HOME:-~/.composer}/auth.json:/root/.composer/auth.json
+    entrypoint: composer
+
+  app:
+    build:
+      context: .
+      dockerfile: docker/php/fpm/Dockerfile
+    image: 376372006699.dkr.ecr.us-east-1.amazonaws.com/hubseg-v2-app:${IMAGE_TAG:-latest}
+    init: true
+    volumes:
+      - ./application:/var/www
+    entrypoint: ./artisan
+    networks:
+      - hubseg-network
+
+  test:
+    build:
+      context: .
+      dockerfile: docker/composer/Dockerfile
+    image: 376372006699.dkr.ecr.us-east-1.amazonaws.com/hubseg-v2-composer:${IMAGE_TAG:-latest}
+    init: true
+    volumes:
+      - ./application:/var/www
+      - composer-cache:/root/.composer/cache
+      - ${COMPOSER_HOME:-~/.composer}/auth.json:/root/.composer/auth.json
+    entrypoint: composer
+    command: run test
+
+  security-check:
+    build:
+      context: .
+      dockerfile: docker/composer/Dockerfile
+    image: 376372006699.dkr.ecr.us-east-1.amazonaws.com/hubseg-v2-composer:${IMAGE_TAG:-latest}
+    init: true
+    volumes:
+      - ./application:/var/www
+    entrypoint: vendor/bin/security-checker
+    command: security:check
+
+volumes:
+  composer-cache:
+    name: composer-cache
+
+# Docker Networks
+networks:
+  hubseg-network:
+    driver: bridge
